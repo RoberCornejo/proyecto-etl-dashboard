@@ -52,4 +52,4 @@ def run_etl(limit=50):
 
 
 if __name__ == "__main__":
-    run_etl(limit=50)
+    run_etl(limit=300)
