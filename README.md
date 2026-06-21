@@ -81,3 +81,15 @@ Esto permite complementar la información del dataset Netflix con los datos obte
   - `data/movies_final.csv`
 
 
+## Configuración
+
+Crear un archivo `.env` en la raíz del proyecto:
+
+```env
+OMDB_API_KEY=e1f375ea
+
+
+SUPABASE_URL=https://gaaurgrajxyjlzdaowgk.supabase.co
+SUPABASE_KEY=sb_publishable_URLeBdWKv2CGKR12iR9kZA_rdoIA46P
+```
+
