@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Entorno virtual
+venv/
+
+# Variables de entorno
+.env
+
+# Archivos generados
+data/omdb_results_sample.csv
+data/movies_final.csv
