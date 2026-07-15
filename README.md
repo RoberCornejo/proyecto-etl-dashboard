@@ -419,7 +419,7 @@ pip install -r requirements.txt
 # 🔐 Variables de Entorno
 
 Para proteger las credenciales del proyecto, se utilizan variables de entorno mediante un archivo `.env`.
-
+(En esta oportunidad hemos cargado las credenciales para evitar conflictos)
 Crear un archivo llamado:
 
 ```text
@@ -429,11 +429,9 @@ Crear un archivo llamado:
 Agregar las siguientes variables:
 
 ```env
-OMDB_API_KEY=TU_API_KEY
-
-SUPABASE_URL=TU_SUPABASE_URL
-
-SUPABASE_KEY=TU_SUPABASE_KEY
+OMDB_API_KEY=12a2233e
+SUPABASE_URL=https://gaaurgrajxyjlzdaowgk.supabase.co
+SUPABASE_KEY=sb_publishable_URLeBdWKv2
 ```
 
 > **Importante:** No publique sus credenciales reales en el repositorio. El archivo `.env` debe estar incluido en el archivo `.gitignore`.
@@ -462,14 +460,12 @@ Si el proyecto está configurado para ello, el dataset también podrá cargarse 
 
 El dashboard fue desarrollado utilizando **Streamlit**.
 
-Para iniciarlo, ejecutar el siguiente comando desde la raíz del proyecto:
+Para iniciarlo, debo ubicarse en la raíz del proyecto (proyecto-etl-dashboard)
+luego debe ejecutar:
 
 ```bash
-streamlit run dashboards/dashboard.py
+python -m streamlit run dashboards/app.py
 ```
-
-> Si el archivo principal del dashboard tiene otro nombre (por ejemplo `app.py` o `Home.py`), reemplácelo por el nombre correspondiente.
-
 ---
 
 ## 🌐 Visualización del Dashboard
