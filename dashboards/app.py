@@ -1,3 +1,4 @@
+import logging
 import os
 import pandas as pd
 import streamlit as st
@@ -5,7 +6,7 @@ from dotenv import load_dotenv
 from supabase import create_client
 import plotly.express as px
 
-from styles import aplicar_css, aplicar_estilo_grafico
+from dashboards.styles import aplicar_estilo_grafico, aplicar_estilo_dashboard
 from charts import (
     grafico_peliculas_por_anio,
     grafico_top_paises,
@@ -35,27 +36,89 @@ st.set_page_config(
     layout="wide"
 )
 
-aplicar_css()
+#aplicar_css()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
+logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
+
 
 @st.cache_data
 def cargar_datos():
-    try:
-        if SUPABASE_URL and SUPABASE_KEY:
+    supabase_available = False
+    local_movies_path = "data/movies_final.csv"
+    local_netflix_path = "data/netflix_titles.csv"
+
+    if SUPABASE_URL and SUPABASE_KEY:
+        try:
             supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
             response = supabase.table("movies_final").select("*").execute()
 
+            if response.error:
+                raise RuntimeError(response.error)
+
             if response.data:
-                return pd.DataFrame(response.data)
+                df = pd.DataFrame(response.data)
+                # Registrar internamente la fuente
+                df.attrs['data_source'] = 'supabase'
+                df.attrs['data_updated'] = None
+                logger.info("Datos cargados desde Supabase con %d registros", len(df))
+                return df
 
-        return pd.read_csv("data/movies_final.csv")
+            logger.warning("Supabase respondió correctamente, pero no devolvió registros.")
+            supabase_available = False
+        except Exception as exc:
+            # Solo log; no mostrar mensajes de Supabase al usuario (según requerimiento)
+            logger.warning(
+                "Fallo al conectar con Supabase: %s. Se continúa con fallback local.",
+                exc,
+            )
+            supabase_available = False
+    else:
+        logger.info("No se encontraron credenciales de Supabase en el entorno.")
 
-    except Exception as e:
-        st.warning(f"No se pudo cargar desde Supabase o archivo local: {e}")
-        return pd.read_csv("data/netflix_titles.csv")
+    if os.path.exists(local_movies_path):
+        try:
+            df = pd.read_csv(local_movies_path)
+            # Metadata interna para indicar fuente y fecha de actualización
+            df.attrs['data_source'] = 'movies_final.csv'
+            try:
+                df.attrs['data_updated'] = pd.to_datetime(
+                    os.path.getmtime(local_movies_path), unit='s'
+                )
+            except Exception:
+                df.attrs['data_updated'] = None
+
+            logger.info("Datos cargados desde %s con %d registros", local_movies_path, len(df))
+            return df
+        except Exception as exc:
+            logger.exception("Error al leer %s", local_movies_path)
+    else:
+        logger.info("Archivo %s no encontrado. Se intentará netflix_titles.csv.", local_movies_path)
+
+    try:
+        df = pd.read_csv(local_netflix_path)
+        df.attrs['data_source'] = 'netflix_titles.csv'
+        try:
+            df.attrs['data_updated'] = pd.to_datetime(
+                os.path.getmtime(local_netflix_path), unit='s'
+            )
+        except Exception:
+            df.attrs['data_updated'] = None
+
+        logger.info("Datos cargados desde %s con %d registros", local_netflix_path, len(df))
+        return df
+    except Exception as exc:
+        logger.exception("Error al leer %s", local_netflix_path)
+        st.error(
+            "No se pudo cargar ningún dataset local. Verifique que los archivos existan y sean legibles.",
+        )
+        raise
 
 
 def valor_limpio(valor):
@@ -65,6 +128,9 @@ def valor_limpio(valor):
 
 
 df = cargar_datos()
+
+# Aplicar estilos globales del dashboard (tema corporativo)
+aplicar_estilo_dashboard()
 
 TITLE = "title"
 YEAR = "release_year"
@@ -92,108 +158,145 @@ if VOTES in df.columns:
     df[VOTES] = pd.to_numeric(df[VOTES], errors="coerce")
 
 
-st.markdown("""
-<div style="padding-bottom:25px;">
+# Header / Hero
+data_source = df.attrs.get('data_source', 'local')
+updated_ts = df.attrs.get('data_updated', None)
+updated_str = updated_ts.strftime('%Y-%m-%d %H:%M') if updated_ts is not None else 'Desconocida'
 
-<h1 style="
-font-size:78px;
-font-weight:900;
-color:white;
-margin-bottom:15px;
-line-height:1;
-">
-🎬 Dashboard de Películas Netflix + OMDb
-</h1>
-
-<p style="
-font-size:27px;
-color:#CBD5E1;
-line-height:1.8;
-margin-bottom:15px;
-">
-Este dashboard integra información del catálogo de Netflix con datos complementarios obtenidos desde OMDb.
-El objetivo es analizar el comportamiento del catálogo según año, país, género,
-calificaciones, directores, votos y premios.
-</p>
-
-<p style="
-font-size:20px;
-color:#94A3B8;
-">
-Fuente de datos: Netflix Dataset + OMDb API + Supabase
-</p>
-
+st.markdown(f"""
+<div class="hero">
+    <div class="hero-title">🎬 Dashboard Netflix + OMDb</div>
+    <div class="hero-subtitle">Análisis ejecutivo del catálogo — métricas y visualizaciones enriquecidas.</div>
+    <div class="hero-meta">Fuente de datos: Netflix + OMDb &nbsp;•&nbsp; Última actualización: {updated_str}</div>
 </div>
 """, unsafe_allow_html=True)
 
-st.divider()
+st.markdown("<hr style='border:0.5px solid rgba(255,255,255,0.06)'/>", unsafe_allow_html=True)
 
 
-st.sidebar.header("🔎 Filtros de análisis")
+st.sidebar.markdown("<div style='font-weight:700; font-size:18px; margin-bottom:6px;'>🔎 Filtros de análisis</div>", unsafe_allow_html=True)
 df_filtrado = df.copy()
 
-if YEAR in df.columns:
-    anios = sorted(df[YEAR].dropna().unique())
-    anios_sel = st.sidebar.multiselect("Año de estreno", anios, default=anios)
-    df_filtrado = df_filtrado[df_filtrado[YEAR].isin(anios_sel)]
+with st.sidebar.expander("Filtros", expanded=True):
+    # Año
+    if YEAR in df.columns:
+        anios = sorted(df[YEAR].dropna().unique())
+        if 'anios_sel' not in st.session_state:
+            st.session_state['anios_sel'] = anios
+        anios_sel = st.multiselect("Año de estreno", anios, default=st.session_state['anios_sel'], key='anios_sel')
+        if anios_sel:
+            df_filtrado = df_filtrado[df_filtrado[YEAR].isin(anios_sel)]
 
-if COUNTRY in df.columns:
-    paises = sorted(df[COUNTRY].dropna().unique())
-    paises_sel = st.sidebar.multiselect("País", paises)
-    if paises_sel:
-        df_filtrado = df_filtrado[df_filtrado[COUNTRY].isin(paises_sel)]
+    # País
+    if COUNTRY in df.columns:
+        paises = sorted(df[COUNTRY].dropna().unique())
+        if 'paises_sel' not in st.session_state:
+            st.session_state['paises_sel'] = []
+        paises_sel = st.multiselect("País", paises, default=st.session_state['paises_sel'], key='paises_sel')
+        if paises_sel:
+            df_filtrado = df_filtrado[df_filtrado[COUNTRY].isin(paises_sel)]
 
-if GENRE in df.columns:
-    generos_lista = sorted(df[GENRE].dropna().str.split(", ").explode().unique())
-    generos_sel = st.sidebar.multiselect("Género", generos_lista)
-    if generos_sel:
+    # Género
+    if GENRE in df.columns:
+        generos_lista = sorted(df[GENRE].dropna().str.split(", ").explode().unique())
+        if 'generos_sel' not in st.session_state:
+            st.session_state['generos_sel'] = []
+        generos_sel = st.multiselect("Género", generos_lista, default=st.session_state['generos_sel'], key='generos_sel')
+        if generos_sel:
+            df_filtrado = df_filtrado[
+                df_filtrado[GENRE].fillna("").apply(lambda x: any(g in x for g in generos_sel))
+            ]
+
+    # Rango IMDb
+    if IMDB in df.columns and df[IMDB].notna().any():
+        min_imdb = float(df[IMDB].min())
+        max_imdb = float(df[IMDB].max())
+        if 'rango_imdb' not in st.session_state:
+            st.session_state['rango_imdb'] = (min_imdb, max_imdb)
+        rango_imdb = st.slider(
+            "Rango IMDb",
+            min_value=min_imdb,
+            max_value=max_imdb,
+            value=st.session_state['rango_imdb'],
+            step=0.1,
+            key='rango_imdb'
+        )
         df_filtrado = df_filtrado[
-            df_filtrado[GENRE].fillna("").apply(lambda x: any(g in x for g in generos_sel))
+            (df_filtrado[IMDB] >= rango_imdb[0]) &
+            (df_filtrado[IMDB] <= rango_imdb[1])
         ]
 
-if IMDB in df.columns and df[IMDB].notna().any():
-    min_imdb = float(df[IMDB].min())
-    max_imdb = float(df[IMDB].max())
+    # Acciones de filtros
+    btn_col1, btn_col2 = st.columns([2,1])
+    with btn_col1:
+        if st.button("Limpiar filtros"):
+            # Resetear valores en session_state a defaults
+            if YEAR in df.columns:
+                st.session_state['anios_sel'] = anios
+            if COUNTRY in df.columns:
+                st.session_state['paises_sel'] = []
+            if GENRE in df.columns:
+                st.session_state['generos_sel'] = []
+            if IMDB in df.columns and df[IMDB].notna().any():
+                st.session_state['rango_imdb'] = (min_imdb, max_imdb)
+            st.experimental_rerun()
+    with btn_col2:
+        st.markdown("<div style='font-size:12px;color:#94A3B8;margin-top:6px;'>Aplicado en tiempo real</div>", unsafe_allow_html=True)
 
-    rango_imdb = st.sidebar.slider(
-        "Rango IMDb",
-        min_value=min_imdb,
-        max_value=max_imdb,
-        value=(min_imdb, max_imdb),
-        step=0.1
+    # Mostrar filtros activos
+    active = []
+    if YEAR in df.columns and st.session_state.get('anios_sel'):
+        active.append(f"Años: {len(st.session_state.get('anios_sel'))}")
+    if COUNTRY in df.columns and st.session_state.get('paises_sel'):
+        active.append(f"Países: {', '.join(st.session_state.get('paises_sel')[:3])}{'...' if len(st.session_state.get('paises_sel'))>3 else ''}")
+    if GENRE in df.columns and st.session_state.get('generos_sel'):
+        active.append(f"Géneros: {', '.join(st.session_state.get('generos_sel')[:3])}{'...' if len(st.session_state.get('generos_sel'))>3 else ''}")
+    if IMDB in df.columns and st.session_state.get('rango_imdb'):
+        r = st.session_state.get('rango_imdb')
+        active.append(f"IMDb: {r[0]}–{r[1]}")
+
+    if active:
+        st.markdown("<hr style='border:0.5px solid rgba(255,255,255,0.04)'/>", unsafe_allow_html=True)
+        st.markdown("**Filtros activos:** " + " • ".join(active))
+
+
+st.markdown('<div class="section-title">📊 Indicadores Ejecutivos</div>', unsafe_allow_html=True)
+
+# Calcular KPIs
+total_peliculas = len(df_filtrado)
+promedio_imdb = round(df_filtrado[IMDB].mean(), 2) if IMDB in df_filtrado.columns and df_filtrado[IMDB].notna().any() else 'No informado'
+promedio_metascore = round(df_filtrado[METASCORE].mean(), 1) if METASCORE in df_filtrado.columns and df_filtrado[METASCORE].notna().any() else 'No informado'
+generos_unicos = df_filtrado[GENRE].dropna().str.split(", ").explode().nunique() if GENRE in df_filtrado.columns and df_filtrado[GENRE].notna().any() else 'No informado'
+directores_unicos = df_filtrado[DIRECTOR].nunique() if DIRECTOR in df_filtrado.columns else 'No informado'
+paises_representados = df_filtrado[COUNTRY].dropna().nunique() if COUNTRY in df_filtrado.columns else 'No informado'
+_box_series = df_filtrado.get('box_office', pd.Series(dtype=float)).dropna()
+if not _box_series.empty:
+    # Limpiar símbolos de moneda, separadores de miles y espacios, convertir a float
+    _box_clean = (
+        _box_series.astype(str)
+        .str.replace(r"[^0-9.\-]", "", regex=True)
+        .replace("", pd.NA)
     )
+    _box_numeric = pd.to_numeric(_box_clean, errors="coerce").dropna()
+    box_office_prom = round(_box_numeric.mean(), 2) if not _box_numeric.empty else 'No informado'
+else:
+    box_office_prom = 'No informado'
+peliculas_premios = df_filtrado[AWARDS].dropna().apply(lambda x: 1 if str(x).strip() not in ['', 'None', 'Sin información'] else 0).sum() if AWARDS in df_filtrado.columns else 'No informado'
 
-    df_filtrado = df_filtrado[
-        (df_filtrado[IMDB] >= rango_imdb[0]) &
-        (df_filtrado[IMDB] <= rango_imdb[1])
-    ]
+cards_html = f"""
+<div class="kpi-grid">
+  <div class="kpi-card"><div class="kpi-icon">📽</div><div class="kpi-value">{total_peliculas}</div><div class="kpi-label">Total Películas</div></div>
+  <div class="kpi-card"><div class="kpi-icon">⭐</div><div class="kpi-value">{promedio_imdb}</div><div class="kpi-label">IMDb Promedio</div></div>
+  <div class="kpi-card"><div class="kpi-icon">🏆</div><div class="kpi-value">{promedio_metascore}</div><div class="kpi-label">Metascore Promedio</div></div>
+  <div class="kpi-card"><div class="kpi-icon">🎭</div><div class="kpi-value">{generos_unicos}</div><div class="kpi-label">Géneros Únicos</div></div>
+  <div class="kpi-card"><div class="kpi-icon">🎬</div><div class="kpi-value">{directores_unicos}</div><div class="kpi-label">Directores Únicos</div></div>
+  <div class="kpi-card"><div class="kpi-icon">🌎</div><div class="kpi-value">{paises_representados}</div><div class="kpi-label">Países Representados</div></div>
+  <div class="kpi-card"><div class="kpi-icon">💰</div><div class="kpi-value">{box_office_prom}</div><div class="kpi-label">Box Office Promedio</div></div>
+  <div class="kpi-card"><div class="kpi-icon">🏅</div><div class="kpi-value">{peliculas_premios}</div><div class="kpi-label">Películas con Premios</div></div>
+</div>
+"""
 
-
-st.subheader("📊 Indicadores principales")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    st.metric("🎬 Total películas", len(df_filtrado))
-
-with col2:
-    if IMDB in df_filtrado.columns and df_filtrado[IMDB].notna().any():
-        st.metric("⭐ Promedio IMDb", round(df_filtrado[IMDB].mean(), 2))
-    else:
-        st.metric("⭐ Promedio IMDb", "No informado")
-
-with col3:
-    if GENRE in df_filtrado.columns and df_filtrado[GENRE].notna().any():
-        generos_total = df_filtrado[GENRE].dropna().str.split(", ").explode()
-        st.metric("🎭 Géneros únicos", generos_total.nunique())
-    else:
-        st.metric("🎭 Géneros únicos", "No informado")
-
-with col4:
-    if METASCORE in df_filtrado.columns and df_filtrado[METASCORE].notna().any():
-        st.metric("🏆 Metascore promedio", round(df_filtrado[METASCORE].mean(), 1))
-    else:
-        st.metric("🏆 Metascore promedio", "No informado")
+st.markdown(cards_html, unsafe_allow_html=True)
 
 caja_analisis("Lectura general:", analisis_general(df_filtrado))
 
@@ -205,7 +308,9 @@ st.subheader("📈 Visualizaciones del catálogo")
 if YEAR in df_filtrado.columns:
     st.markdown("### 📈 Evolución del catálogo por año")
     fig_anio, datos_anio = grafico_peliculas_por_anio(df_filtrado, YEAR)
+    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
     st.plotly_chart(fig_anio, use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
     caja_analisis("Análisis de evolución:", analisis_evolucion(datos_anio))
 
 
@@ -218,13 +323,17 @@ with col_g1:
     if COUNTRY in df_filtrado.columns:
         st.markdown("### 🌍 Países con más películas")
         fig_paises, top_paises = grafico_top_paises(df_filtrado, COUNTRY)
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
         st.plotly_chart(fig_paises, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 with col_g2:
     if GENRE in df_filtrado.columns:
         st.markdown("### 🎭 Géneros más frecuentes")
         fig_generos, top_generos = grafico_top_generos(df_filtrado, GENRE)
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
         st.plotly_chart(fig_generos, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 caja_analisis(
     "Análisis de países y géneros:",
@@ -235,7 +344,9 @@ caja_analisis(
 if IMDB in df_filtrado.columns:
     st.markdown("### ⭐ Distribución de calificaciones IMDb")
     fig_imdb, imdb_rangos = grafico_distribucion_imdb(df_filtrado, IMDB)
+    st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
     st.plotly_chart(fig_imdb, use_container_width=True)
+    st.markdown("</div>", unsafe_allow_html=True)
     caja_analisis("Análisis de calificaciones:", analisis_imdb_rangos(imdb_rangos))
 
 
@@ -292,7 +403,9 @@ with col_g3:
         )
 
         fig = aplicar_estilo_grafico(fig)
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
         st.plotly_chart(fig, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     else:
         st.info("No se encontró la columna director_y o imdb_rating.")
@@ -305,7 +418,9 @@ with col_g4:
             TITLE,
             IMDB
         )
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
         st.plotly_chart(fig_top_imdb, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
 caja_analisis(
     "Análisis de directores:",
@@ -324,7 +439,9 @@ with col_g5:
     if IMDB in df_filtrado.columns:
         st.markdown("### 📊 Histograma de IMDb")
         fig_hist, datos_hist = grafico_histograma_imdb(df_filtrado, IMDB)
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
         st.plotly_chart(fig_hist, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
         caja_analisis(
             "Análisis estadístico IMDb:",
             analisis_histograma_imdb(datos_hist, IMDB)
@@ -339,7 +456,9 @@ with col_g6:
             METASCORE,
             TITLE
         )
+        st.markdown("<div class='chart-card'>", unsafe_allow_html=True)
         st.plotly_chart(fig_scatter, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
         caja_analisis(
             "Análisis IMDb vs Metascore:",
             analisis_imdb_vs_metascore(datos_scatter, IMDB, METASCORE)
@@ -432,7 +551,7 @@ st.subheader("📌 Conclusiones del análisis")
 
 st.write("""
 El análisis del catálogo permite observar cómo se distribuyen las películas según año, país, género y evaluación externa.
-La integración entre Netflix Dataset, OMDb API y Supabase aporta valor al proceso, ya que transforma los datos originales
+La integración entre el dataset de Netflix y OMDb aporta valor al proceso, ya que transforma los datos originales
 en una base enriquecida con calificaciones IMDb, Metascore, votos, premios, directores y actores.
 
 A partir de las visualizaciones se pueden identificar tendencias relevantes, como los países con mayor presencia,

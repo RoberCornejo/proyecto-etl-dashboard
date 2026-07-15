@@ -1,7 +1,7 @@
 import pandas as pd
 import plotly.express as px
 
-from styles import aplicar_estilo_grafico, PALETA_BARRAS
+from dashboards.styles import aplicar_estilo_grafico, PALETA_BARRAS, NETFLIX_RED, ACCENT
 
 
 def grafico_peliculas_por_anio(df, year_col):
@@ -27,8 +27,10 @@ def grafico_peliculas_por_anio(df, year_col):
     )
 
     fig.update_traces(
-        line=dict(color="#38BDF8", width=4),
-        marker=dict(size=9, color="#FACC15")
+        line=dict(color=ACCENT, width=3),
+        marker=dict(size=8, color=NETFLIX_RED),
+        hovertemplate=None,
+        mode='lines+markers'
     )
 
     return aplicar_estilo_grafico(fig), datos
@@ -58,7 +60,11 @@ def grafico_top_paises(df, country_col):
 
     fig.update_traces(
         marker_color=PALETA_BARRAS[:len(datos)],
-        textposition="outside"
+        textposition="outside",
+        texttemplate='%{y}',
+        hovertemplate=None,
+        textfont=dict(color='white', size=12),
+        cliponaxis=False
     )
 
     return aplicar_estilo_grafico(fig), datos
@@ -84,7 +90,11 @@ def grafico_top_generos(df, genre_col):
 
     fig.update_traces(
         marker_color=PALETA_BARRAS[:len(datos)],
-        textposition="outside"
+        textposition="outside",
+        texttemplate='%{y}',
+        hovertemplate=None,
+        textfont=dict(color='white', size=12),
+        cliponaxis=False
     )
 
     return aplicar_estilo_grafico(fig), datos
@@ -120,7 +130,11 @@ def grafico_distribucion_imdb(df, imdb_col):
 
     fig.update_traces(
         marker_color=PALETA_BARRAS[:len(datos)],
-        textposition="outside"
+        textposition="outside",
+        texttemplate='%{y}',
+        hovertemplate=None,
+        textfont=dict(color='white', size=12),
+        cliponaxis=False
     )
 
     return aplicar_estilo_grafico(fig), datos
@@ -157,7 +171,11 @@ def grafico_directores_mejor_evaluados(df, director_col, imdb_col, title_col):
 
     fig.update_traces(
         marker_color=PALETA_BARRAS[:len(directores)],
-        textposition="outside"
+        textposition="outside",
+        texttemplate='%{x:.2f}',
+        hovertemplate=None,
+        textfont=dict(color='white', size=12),
+        cliponaxis=False
     )
 
     fig.update_layout(
@@ -197,7 +215,11 @@ def grafico_top_peliculas_imdb(df, title_col, imdb_col):
 
     fig.update_traces(
         marker_color=PALETA_BARRAS[:len(datos)],
-        textposition="outside"
+        textposition="outside",
+        texttemplate='%{x:.2f}',
+        hovertemplate=None,
+        textfont=dict(color='white', size=12),
+        cliponaxis=False
     )
 
     fig.update_layout(yaxis={"categoryorder": "total ascending"})
@@ -238,8 +260,8 @@ def grafico_histograma_imdb(df, imdb_col):
 
     for i, barra in enumerate(fig.data):
         barra.marker.color = colores[i % len(colores)]
-        barra.marker.line.width = 1
-        barra.marker.line.color = "#FFFFFF"
+        barra.marker.line.width = 0
+        # show value labels on histogram bars is not typical; rely on hover
 
     fig.update_layout(
         bargap=0.03
@@ -265,11 +287,13 @@ def grafico_imdb_vs_metascore(df, imdb_col, metascore_col, title_col):
 
     fig.update_traces(
         marker=dict(
-            size=10,
-            color="#38BDF8",
-            opacity=0.75,
-            line=dict(width=1, color="#F8FAFC")
-        )
+            size=9,
+            color=ACCENT,
+            opacity=0.85,
+            line=dict(width=0)
+        ),
+        hovertemplate='<b>%{hovertext}</b><br>IMDb: %{y}<br>Metascore: %{x}',
+        hoverlabel=dict(font=dict(size=12))
     )
 
     return aplicar_estilo_grafico(fig), datos

@@ -1,4 +1,6 @@
 import requests
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 import os
 from dotenv import load_dotenv
 
@@ -18,7 +20,12 @@ def get_movie_data(title, year=None):
         params["y"] = int(year)
 
     try:
-        response = requests.get(BASE_URL, params=params, timeout=10)
+        response = requests.get(
+        BASE_URL,
+        params=params,
+        timeout=10,
+        verify=False
+)
         response.raise_for_status()
         data = response.json()
     except requests.RequestException:

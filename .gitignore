@@ -12,3 +12,6 @@ venv/
 # Archivos generados
 data/omdb_results_sample.csv
 data/movies_final.csv
+.venv/
+__pycache__/
+*.pyc

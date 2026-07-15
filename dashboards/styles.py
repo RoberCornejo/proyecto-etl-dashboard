@@ -1,166 +1,188 @@
 import streamlit as st
 
+# Palette and theme
+NETFLIX_RED = "#E50914"
+SECONDARY = "#564D80"
+ACCENT = "#00D4FF"
+DARK_BG = "#0B1020"
+CARD_BG = "#141B2D"
+TEXT = "#F8FAFC"
+TEXT_SUB = "#CBD5E1"
+CARD_RADIUS = "12px"
+
 PALETA_BARRAS = [
-    "#EF4444", "#F59E0B", "#FACC15", "#22C55E", "#3B82F6",
-    "#8B5CF6", "#EC4899", "#14B8A6", "#F97316", "#06B6D4"
+    NETFLIX_RED, "#F59E0B", "#FACC15", "#22C55E", "#3B82F6",
+    "#8B5CF6", "#EC4899", "#14B8A6", "#F97316", ACCENT
 ]
 
-COLOR_FONDO = "#0F172A"
-COLOR_CARD = "#111827"
-COLOR_TEXTO = "#F8FAFC"
-COLOR_TEXTO_SUAVE = "#CBD5E1"
-COLOR_GRILLA = "#334155"
-# Tamaños de fuente
-TAMANO_ENCABEZADO = 90
-TAMANO_SUBTITULO = 28
-TAMANO_FUENTE = 22
-TAMANO_H2 = 46
-TAMANO_H3 = 36
 
-st.markdown(f"""
-<style>
+def aplicar_estilo_dashboard():
+    """Inyecta CSS global para el tema corporativo y define clases para tarjetas KPI."""
+    css = f"""
+    <style>
+    /* Root */
+    .stApp {{
+        background-color: {DARK_BG};
+        color: {TEXT};
+        font-family: 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }}
 
-h1 {{
-    font-size:{TAMANO_H2}px !important;
-    font-weight:800 !important;
-}}
+    /* Header / Hero */
+    .hero {{
+        padding: 24px 6px 12px 6px;
+    }}
 
-h2 {{
-    font-size:{TAMANO_H2}px !important;
-}}
+    .hero-title {{
+        font-size: 56px;
+        font-weight: 800;
+        color: {TEXT};
+        margin: 0 0 6px 0;
+    }}
 
-h3 {{
-    font-size:{TAMANO_H3}px !important;
-}}
+    .hero-subtitle {{
+        font-size: 18px;
+        color: {TEXT_SUB};
+        margin: 0 0 8px 0;
+    }}
 
-p {{
-    font-size:{TAMANO_FUENTE}px !important;
-}}
+    .hero-meta {{
+        font-size: 14px;
+        color: #94A3B8;
+    }}
 
-.hero-title {{
-    font-size:{TAMANO_ENCABEZADO}px !important;
-    font-weight:900 !important;
-    color:#FFFFFF !important;
-    line-height:1.05;
-    margin-bottom:18px;
-}}
+    /* KPI cards */
+    .kpi-grid {{
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 18px;
+        margin-top: 18px;
+    }}
 
-.hero-subtitle {{
-    font-size:{TAMANO_SUBTITULO}px !important;
-    color:#CBD5E1 !important;
-    line-height:1.7;
-}}
+    .kpi-card {{
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
+        border-radius: {CARD_RADIUS};
+        padding: 18px;
+        box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+        border: 1px solid rgba(255,255,255,0.03);
+        transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }}
 
-.hero-source {{
-    font-size:20px !important;
-    color:#94A3B8 !important;
-}}
+    .kpi-icon {{
+        font-size: 20px;
+        margin-bottom: 6px;
+    }}
 
-</style>
-""", unsafe_allow_html=True)
+    .kpi-value {{
+        font-size: 28px;
+        font-weight: 700;
+        color: {TEXT};
+    }}
+
+    .kpi-card:hover {{
+        transform: translateY(-6px);
+        box-shadow: 0 12px 30px rgba(2,6,23,0.75);
+    }}
+
+    .kpi-label {{
+        font-size: 13px;
+        color: {TEXT_SUB};
+    }}
+
+    /* Sidebar */
+    .css-1d391kg {{ /* streamlit sidebar override hook */
+        background-color: {CARD_BG} !important;
+        border-radius: 12px;
+        padding: 12px !important;
+    }}
+
+    /* Separators and headings */
+    .section-title {{
+        font-size: 20px;
+        color: {TEXT};
+        margin: 6px 0 12px 0;
+        font-weight: 700;
+    }}
+
+    .section {{
+        background: transparent;
+        padding: 12px 0 22px 0;
+    }}
+
+    /* Responsive adjustments */
+    @media (max-width: 1100px) {{
+        .hero-title {{ font-size: 44px; }}
+        .kpi-value {{ font-size: 24px; }}
+        .kpi-grid {{ grid-template-columns: repeat(2, 1fr); gap: 12px; }}
+    }}
+
+    @media (max-width: 720px) {{
+        .hero-title {{ font-size: 32px; }}
+        .kpi-value {{ font-size: 20px; }}
+        .kpi-grid {{ grid-template-columns: repeat(1, 1fr); gap: 10px; }}
+        .hero-subtitle {{ font-size: 14px; }}
+    }}
+
+    /* Ensure tables look good */
+    .stDataFrame table {{
+        background: transparent;
+    }}
+
+    /* Chart card */
+    .chart-card {{
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 18px;
+        box-shadow: 0 8px 24px rgba(2,6,23,0.6);
+        border: 1px solid rgba(255,255,255,0.035);
+    }}
+
+    </style>
+    """
+    st.markdown(css, unsafe_allow_html=True)
 
 
 def aplicar_estilo_grafico(fig):
+    """Aplica estilo consistente a figuras Plotly para el tema oscuro.
+
+    Hace fondos transparentes para integrarse con tarjetas y usa la paleta definida.
+    """
 
     fig.update_layout(
         font=dict(
-            size=20,
-            color=COLOR_TEXTO
+            family="Segoe UI, Roboto, Helvetica, Arial",
+            size=12,
+            color=TEXT
         ),
-
         title_font=dict(
-            size=30,
-            color=COLOR_TEXTO
-        ),
-
-        xaxis_title_font=dict(
-            size=22,
-            color=COLOR_TEXTO_SUAVE
-        ),
-
-        yaxis_title_font=dict(
-            size=22,
-            color=COLOR_TEXTO_SUAVE
-        ),
-
-        legend_font=dict(
             size=18,
-            color=COLOR_TEXTO
+            color=TEXT
         ),
-
-        plot_bgcolor=COLOR_FONDO,
-        paper_bgcolor=COLOR_FONDO,
-
-        margin=dict(
-            l=70,
-            r=70,
-            t=100,
-            b=100
-        )
+        legend_font=dict(
+            size=12,
+            color=TEXT
+        ),
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)',
+        margin=dict(l=40, r=24, t=72, b=40),
+        hovermode='closest'
     )
 
     fig.update_xaxes(
-        tickfont=dict(
-            size=18,
-            color=COLOR_TEXTO_SUAVE
-        ),
-        showgrid=True,
-        gridcolor=COLOR_GRILLA
+        tickfont=dict(size=11, color=TEXT_SUB),
+        title_font=dict(size=12, color=TEXT_SUB),
+        gridcolor='rgba(255,255,255,0.03)'
     )
 
     fig.update_yaxes(
-        tickfont=dict(
-            size=18,
-            color=COLOR_TEXTO_SUAVE
-        ),
-        showgrid=True,
-        gridcolor=COLOR_GRILLA
+        tickfont=dict(size=11, color=TEXT_SUB),
+        title_font=dict(size=12, color=TEXT_SUB),
+        gridcolor='rgba(255,255,255,0.03)'
     )
 
-    fig.update_traces(
-        textfont=dict(
-            size=20,
-            color=COLOR_TEXTO
-        ),
-        cliponaxis=False
-    )
+    # Apply marker/trace defaults
+    for trace in fig.data:
+        if 'marker' in trace:
+            trace.marker.line = dict(width=0)
 
     return fig
-
-def mostrar_encabezado():
-    st.markdown("""
-    <div style="padding: 20px 0 35px 0;">
-
-        <div style="
-            font-size: 90px;
-            font-weight: 900;
-            color: #FFFFFF;
-            line-height: 1.05;
-            letter-spacing: -2px;
-            margin-bottom: 20px;
-        ">
-            🎬 Dashboard de Películas Netflix + OMDb
-        </div>
-
-        <div style="
-            font-size: 30px;
-            color: #CBD5E1;
-            line-height: 1.7;
-            max-width: 1500px;
-            margin-bottom: 18px;
-        ">
-            Este dashboard integra información del catálogo de Netflix con datos complementarios obtenidos desde OMDb.
-            El objetivo es analizar el comportamiento del catálogo según año, país, género, calificaciones,
-            directores, votos y premios.
-        </div>
-
-        <div style="
-            font-size: 22px;
-            color: #94A3B8;
-            margin-top: 8px;
-        ">
-            Fuente de datos: Netflix Dataset + OMDb API + Supabase
-        </div>
-
-    </div>
-    """, unsafe_allow_html=True)
